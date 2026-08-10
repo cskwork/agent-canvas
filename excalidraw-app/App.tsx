@@ -142,6 +142,7 @@ import DebugCanvas, {
 } from "./components/DebugCanvas";
 import { useSimulatedCollaborators } from "./debugCollaborators";
 import { AIComponents } from "./components/AI";
+import { AINativeChat } from "./components/AINativeChat/AINativeChat";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 
 import "./index.scss";
@@ -1297,6 +1298,7 @@ const ExcalidrawWrapper = () => {
           />
         )}
       </Excalidraw>
+      {excalidrawAPI && <AINativeChat excalidrawAPI={excalidrawAPI} />}
     </div>
   );
 };

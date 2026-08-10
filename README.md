@@ -1,3 +1,18 @@
+# Agent Canvas
+
+An AI-native fork of Excalidraw. Open **Draw with AI** in the bottom-right, attach any current canvas selection, choose one or more locally installed agents, and ask them to create editable Excalidraw elements. Claude Code, Codex, and Hermes are detected automatically; the first available agent is selected by default.
+
+## Run locally
+
+```bash
+yarn
+yarn start
+```
+
+The local Vite development server exposes an allowlisted bridge for installed agent CLIs. Prompts are passed without a shell, agents run in temporary directories, and responses are validated against a narrow drawing schema before they reach the canvas. The bridge exists only during local development; static production builds do not execute programs on the host machine.
+
+---
+
 <a href="https://excalidraw.com/" target="_blank" rel="noopener">
   <picture>
     <source media="(prefers-color-scheme: dark)" alt="Excalidraw" srcset="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github/excalidraw_github_cover_2_dark.png" />
