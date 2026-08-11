@@ -7,19 +7,21 @@ import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import "./AINativeChat.scss";
 
 import { detectLocalAgents, generateWithLocalAgents } from "./api";
+import { loadChatMessages, saveChatMessages } from "./chatStorage";
 import { applyAIDiagram } from "./sceneMaterializer";
 import { serializeSelectedElements } from "./selectionContext";
 
-import type { AIDiagram, LocalAgent, SelectionContext } from "./aiTypes";
+import type {
+  AIDiagram,
+  ChatMessage,
+  LocalAgent,
+  SelectionContext,
+} from "./aiTypes";
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant" | "error";
-  content: string;
-  agentName?: string;
-  diagram?: AIDiagram;
-  selection?: SelectionContext;
-  applied?: boolean;
+type QueuedRequest = {
+  prompt: string;
+  agentIds: LocalAgent["id"][];
+  selection: SelectionContext;
 };
 
 const EMPTY_SELECTION: SelectionContext = { elements: [], truncated: false };
@@ -73,10 +75,19 @@ export const AINativeChat = ({
   const [bridgeError, setBridgeError] = useState("");
   const [prompt, setPrompt] = useState("");
   const [selection, setSelection] = useState<SelectionContext>(EMPTY_SELECTION);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(loadChatMessages);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [queuedCount, setQueuedCount] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesStateRef = useRef<ChatMessage[]>(messages);
+  const requestQueueRef = useRef<QueuedRequest[]>([]);
+  const isProcessingRef = useRef(false);
+
+  useEffect(() => {
+    messagesStateRef.current = messages;
+    saveChatMessages(messages);
+  }, [messages]);
 
   const availableAgents = useMemo(
     () => agents.filter((agent) => agent.available),
@@ -162,26 +173,13 @@ export const AINativeChat = ({
     );
   };
 
-  const submit = async (nextPrompt = prompt) => {
-    const trimmedPrompt = nextPrompt.trim();
-    if (!trimmedPrompt || selectedAgentIds.length === 0 || isGenerating) {
-      return;
-    }
-
-    const selectionSnapshot = selection;
-    setPrompt("");
-    setMessages((current) => [
-      ...current,
-      { id: makeId(), role: "user", content: trimmedPrompt },
-    ]);
-    setIsGenerating(true);
-
+  const runRequest = async (request: QueuedRequest) => {
     try {
       const response = await generateWithLocalAgents({
-        prompt: trimmedPrompt,
-        agentIds: selectedAgentIds,
-        selection: selectionSnapshot,
-        history: messages
+        prompt: request.prompt,
+        agentIds: request.agentIds,
+        selection: request.selection,
+        history: messagesStateRef.current
           .filter((message) => message.role !== "error")
           .slice(-4)
           .map((message) => ({
@@ -221,11 +219,11 @@ export const AINativeChat = ({
             agentName: result.agentName,
             content: result.diagram.summary,
             diagram: result.diagram,
-            selection: selectionSnapshot,
+            selection: request.selection,
             applied: false,
           };
           if (!autoApplied) {
-            applyAIDiagram(excalidrawAPI, result.diagram, selectionSnapshot);
+            applyAIDiagram(excalidrawAPI, result.diagram, request.selection);
             message.applied = true;
             autoApplied = true;
           }
@@ -245,9 +243,48 @@ export const AINativeChat = ({
               : "The local agents could not complete this drawing.",
         },
       ]);
-    } finally {
-      setIsGenerating(false);
     }
+  };
+
+  // Prompts sent while agents are busy wait in a client-side FIFO queue and
+  // run one at a time, so every request eventually draws.
+  const processQueue = async () => {
+    if (isProcessingRef.current) {
+      return;
+    }
+    isProcessingRef.current = true;
+    setIsGenerating(true);
+    try {
+      while (requestQueueRef.current.length > 0) {
+        const request = requestQueueRef.current.shift()!;
+        setQueuedCount(requestQueueRef.current.length);
+        await runRequest(request);
+      }
+    } finally {
+      isProcessingRef.current = false;
+      setIsGenerating(false);
+      setQueuedCount(0);
+    }
+  };
+
+  const submit = (nextPrompt = prompt) => {
+    const trimmedPrompt = nextPrompt.trim();
+    if (!trimmedPrompt || selectedAgentIds.length === 0) {
+      return;
+    }
+
+    setPrompt("");
+    setMessages((current) => [
+      ...current,
+      { id: makeId(), role: "user", content: trimmedPrompt },
+    ]);
+    requestQueueRef.current.push({
+      prompt: trimmedPrompt,
+      agentIds: selectedAgentIds,
+      selection,
+    });
+    setQueuedCount(requestQueueRef.current.length);
+    void processQueue();
   };
 
   return (
@@ -379,6 +416,7 @@ export const AINativeChat = ({
                 <span />
                 <span />
                 Agents are sketching
+                {queuedCount > 0 ? ` · ${queuedCount} queued` : ""}
               </div>
             )}
           </div>
@@ -433,11 +471,7 @@ export const AINativeChat = ({
                 type="button"
                 className="ai-native-chat__send-button"
                 aria-label="Send drawing prompt"
-                disabled={
-                  !prompt.trim() ||
-                  selectedAgentIds.length === 0 ||
-                  isGenerating
-                }
+                disabled={!prompt.trim() || selectedAgentIds.length === 0}
                 onClick={() => void submit()}
               >
                 <SendIcon />

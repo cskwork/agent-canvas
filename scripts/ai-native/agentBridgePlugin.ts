@@ -13,6 +13,8 @@ import { spawn } from "node:child_process";
 
 import { parseAIDiagram } from "../../excalidraw-app/components/AINativeChat/sceneInstructions";
 
+import { createGenerationQueue } from "./generationQueue";
+
 import type { AIDiagram } from "../../excalidraw-app/components/AINativeChat/aiTypes";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
@@ -395,7 +397,7 @@ export const aiNativeAgentBridgePlugin = (rootDirectory: string): Plugin => ({
   name: "excalidraw-ai-native-agent-bridge",
   apply: "serve",
   configureServer(server) {
-    let activeRequests = 0;
+    const generationQueue = createGenerationQueue(2, 8);
     const schemaPath = path.resolve(
       rootDirectory,
       "scripts/ai-native/drawing.schema.json",
@@ -444,13 +446,8 @@ export const aiNativeAgentBridgePlugin = (rootDirectory: string): Plugin => ({
         });
         return;
       }
-      if (activeRequests >= 2) {
-        sendJSON(response, 429, { error: "Local agents are already busy" });
-        return;
-      }
-
+      let slot: Promise<void> | null = null;
       try {
-        activeRequests += 1;
         const body = await readRequestJSON(request);
         if (
           !isRecord(body) ||
@@ -476,6 +473,17 @@ export const aiNativeAgentBridgePlugin = (rootDirectory: string): Plugin => ({
           sendJSON(response, 400, { error: "Drawing request is invalid" });
           return;
         }
+
+        // Wait in line for a generation slot instead of rejecting bursts;
+        // only an overflowing backlog gets a 429.
+        slot = generationQueue.acquire();
+        if (!slot) {
+          sendJSON(response, 429, {
+            error: "Too many queued drawing requests; try again shortly",
+          });
+          return;
+        }
+        await slot;
 
         const detected = await detectAgents();
         const selectedIds = [...new Set(body.agentIds as AgentId[])];
@@ -525,7 +533,9 @@ export const aiNativeAgentBridgePlugin = (rootDirectory: string): Plugin => ({
           error: error instanceof Error ? error.message : "Invalid request",
         });
       } finally {
-        activeRequests -= 1;
+        if (slot) {
+          generationQueue.release();
+        }
       }
     });
   },

@@ -117,6 +117,16 @@ export type AIConversationTurn = {
   diagram?: AIDiagram;
 };
 
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant" | "error";
+  content: string;
+  agentName?: string;
+  diagram?: AIDiagram;
+  selection?: SelectionContext;
+  applied?: boolean;
+};
+
 export type GenerateResponse = {
   results: AgentGenerationResult[];
 };
