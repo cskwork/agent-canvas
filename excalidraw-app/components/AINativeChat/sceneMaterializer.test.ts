@@ -98,6 +98,73 @@ describe("AI diagram materialization", () => {
     expect(arrow?.endBinding?.elementId).toBeDefined();
   });
 
+  it("materializes the extended vocabulary", () => {
+    const elements = materializeAIDiagram({
+      summary: "Extended",
+      elements: [
+        {
+          id: "node",
+          type: "rectangle",
+          x: 0,
+          y: 0,
+          width: 180,
+          height: 80,
+          label: "Node",
+          rounded: true,
+          angle: 90,
+        },
+        {
+          id: "loop",
+          type: "arrow",
+          x: 180,
+          y: 40,
+          points: [
+            [0, 0],
+            [80, -40],
+            [0, -80],
+          ],
+          endArrowhead: "none",
+        },
+        {
+          id: "sketch",
+          type: "freedraw",
+          x: -50,
+          y: 0,
+          points: [
+            [0, 0],
+            [12, 8],
+            [30, 4],
+          ],
+        },
+        {
+          id: "wrap",
+          type: "frame",
+          x: 0,
+          y: 0,
+          children: ["node"],
+          name: "Zone",
+        },
+      ],
+    });
+
+    const rectangle = elements.find((element) => element.type === "rectangle");
+    expect(rectangle?.roundness).not.toBeNull();
+    expect(rectangle?.angle).toBeCloseTo(Math.PI / 2);
+
+    const arrow = elements.find(isArrowElement);
+    expect(arrow?.points).toHaveLength(3);
+    expect(arrow?.endArrowhead).toBeNull();
+    expect(arrow?.width).toBe(80);
+    expect(arrow?.height).toBe(80);
+
+    const freedraw = elements.find((element) => element.type === "freedraw");
+    expect(freedraw?.width).toBe(30);
+
+    const frame = elements.find((element) => element.type === "frame");
+    expect(frame).toBeDefined();
+    expect(rectangle?.frameId).toBe(frame?.id);
+  });
+
   it("uses a visible default stroke for dark canvases", () => {
     const elements = materializeAIDiagram(
       {

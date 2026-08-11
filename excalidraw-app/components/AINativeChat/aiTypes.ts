@@ -17,9 +17,38 @@ export const AI_ELEMENT_TYPES = [
   "text",
   "arrow",
   "line",
+  "freedraw",
+  "frame",
+  "embeddable",
 ] as const;
 
 export type AIElementType = typeof AI_ELEMENT_TYPES[number];
+
+export const AI_ARROWHEADS = [
+  "arrow",
+  "bar",
+  "dot",
+  "circle",
+  "circle_outline",
+  "triangle",
+  "triangle_outline",
+  "diamond",
+  "diamond_outline",
+  "crowfoot_one",
+  "crowfoot_many",
+  "crowfoot_one_or_many",
+  "none",
+] as const;
+
+export type AIArrowhead = typeof AI_ARROWHEADS[number];
+
+export const AI_FONT_FAMILIES = ["hand-drawn", "normal", "code"] as const;
+
+export type AIFontFamily = typeof AI_FONT_FAMILIES[number];
+
+export const AI_TEXT_ALIGNS = ["left", "center", "right"] as const;
+
+export type AITextAlign = typeof AI_TEXT_ALIGNS[number];
 
 export type AIElementSpec = {
   id: string;
@@ -28,16 +57,30 @@ export type AIElementSpec = {
   y: number;
   width?: number;
   height?: number;
+  points?: [number, number][];
   text?: string;
   label?: string;
   fromId?: string;
   toId?: string;
+  startArrowhead?: AIArrowhead;
+  endArrowhead?: AIArrowhead;
+  elbowed?: boolean;
   strokeColor?: string;
   backgroundColor?: string;
   fillStyle?: "hachure" | "solid" | "cross-hatch";
   strokeStyle?: "solid" | "dashed" | "dotted";
+  strokeWidth?: number;
   roughness?: 0 | 1 | 2;
   opacity?: number;
+  angle?: number;
+  rounded?: boolean;
+  fontSize?: number;
+  fontFamily?: AIFontFamily;
+  textAlign?: AITextAlign;
+  link?: string;
+  groupIds?: string[];
+  children?: string[];
+  name?: string;
 };
 
 export type AIDiagram = {

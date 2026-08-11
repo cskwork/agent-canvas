@@ -1,3 +1,4 @@
+import { FONT_FAMILY, ROUNDNESS } from "@excalidraw/common";
 import {
   CaptureUpdateAction,
   convertToExcalidrawElements,
@@ -5,19 +6,55 @@ import {
   newElementWith,
   viewportCoordsToSceneCoords,
 } from "@excalidraw/excalidraw";
+import { newEmbeddableElement, newFreeDrawElement } from "@excalidraw/element";
 
+import type { LocalPoint, Radians } from "@excalidraw/math";
 import type { ExcalidrawElementSkeleton } from "@excalidraw/element";
+import type { Arrowhead, FontFamilyValues } from "@excalidraw/element/types";
 import type {
   AppState,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types";
 
-import type { AIDiagram, AIElementSpec, SelectionContext } from "./aiTypes";
+import type {
+  AIDiagram,
+  AIElementSpec,
+  AIFontFamily,
+  SelectionContext,
+} from "./aiTypes";
 
 const DEFAULT_LIGHT_STROKE = "#1b1b1f";
 const DEFAULT_DARK_STROKE = "#f1f3f5";
 const DEFAULT_BACKGROUND = "transparent";
 const SELECTION_GAP = 96;
+
+const FONT_FAMILY_BY_NAME: Record<AIFontFamily, FontFamilyValues> = {
+  "hand-drawn": FONT_FAMILY.Excalifont,
+  normal: FONT_FAMILY.Nunito,
+  code: FONT_FAMILY["Comic Shanns"],
+};
+
+const toRadians = (degrees: number | undefined) =>
+  degrees === undefined ? undefined : ((degrees * Math.PI) / 180) as Radians;
+
+const toArrowhead = (value: AIElementSpec["startArrowhead"]) =>
+  value === undefined ? undefined : value === "none" ? null : (value as Arrowhead);
+
+// Excalidraw expects points[0] at the element origin and width/height to
+// match the point bounds; agents send arbitrary offsets, so normalize.
+const normalizePoints = (points: [number, number][]) => {
+  const [originX, originY] = points[0];
+  const shifted = points.map(
+    ([x, y]) => [x - originX, y - originY] as LocalPoint,
+  );
+  const xs = shifted.map(([x]) => x);
+  const ys = shifted.map(([, y]) => y);
+  return {
+    points: shifted,
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys),
+  };
+};
 
 const toSkeleton = (
   element: AIElementSpec,
@@ -25,35 +62,104 @@ const toSkeleton = (
 ): ExcalidrawElementSkeleton => {
   const base = {
     id: element.id,
-    type: element.type,
     x: element.x,
     y: element.y,
     strokeColor: element.strokeColor ?? defaultStroke,
     backgroundColor: element.backgroundColor ?? DEFAULT_BACKGROUND,
     fillStyle: element.fillStyle ?? "solid",
     strokeStyle: element.strokeStyle ?? "solid",
+    strokeWidth: element.strokeWidth,
     roughness: element.roughness ?? 1,
     opacity: element.opacity ?? 100,
+    angle: toRadians(element.angle),
+    link: element.link,
+    groupIds: element.groupIds,
   };
+  const label = element.label
+    ? {
+        text: element.label,
+        fontSize: element.fontSize,
+        fontFamily: element.fontFamily
+          ? FONT_FAMILY_BY_NAME[element.fontFamily]
+          : undefined,
+        textAlign: element.textAlign,
+      }
+    : undefined;
 
   if (element.type === "text") {
     return {
       ...base,
       type: "text",
       text: element.text!,
-    };
+      width: element.width,
+      height: element.height,
+      fontSize: element.fontSize,
+      fontFamily: element.fontFamily
+        ? FONT_FAMILY_BY_NAME[element.fontFamily]
+        : undefined,
+      textAlign: element.textAlign,
+    } as ExcalidrawElementSkeleton;
+  }
+
+  if (element.type === "frame") {
+    return {
+      type: "frame",
+      id: element.id,
+      children: element.children!,
+      name: element.name,
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+    } as ExcalidrawElementSkeleton;
+  }
+
+  if (element.type === "freedraw") {
+    const { points, width, height } = normalizePoints(element.points!);
+    return newFreeDrawElement({
+      ...base,
+      type: "freedraw",
+      points,
+      width: element.width ?? width,
+      height: element.height ?? height,
+      simulatePressure: true,
+    });
+  }
+
+  if (element.type === "embeddable") {
+    return newEmbeddableElement({
+      ...base,
+      type: "embeddable",
+      width: element.width!,
+      height: element.height!,
+      link: element.link!,
+    });
   }
 
   if (element.type === "arrow" || element.type === "line") {
+    const pointGeometry = element.points
+      ? normalizePoints(element.points)
+      : undefined;
     return {
       ...base,
       type: element.type,
-      width: element.width!,
-      height: element.height!,
-      label: element.label ? { text: element.label } : undefined,
-      start: element.fromId ? { id: element.fromId } : undefined,
-      end: element.toId ? { id: element.toId } : undefined,
-    };
+      width: pointGeometry?.width ?? element.width!,
+      height: pointGeometry?.height ?? element.height!,
+      points: pointGeometry?.points,
+      roundness: element.rounded
+        ? { type: ROUNDNESS.PROPORTIONAL_RADIUS }
+        : undefined,
+      label,
+      ...(element.type === "arrow"
+        ? {
+            start: element.fromId ? { id: element.fromId } : undefined,
+            end: element.toId ? { id: element.toId } : undefined,
+            startArrowhead: toArrowhead(element.startArrowhead),
+            endArrowhead: toArrowhead(element.endArrowhead),
+            elbowed: element.elbowed,
+          }
+        : {}),
+    } as ExcalidrawElementSkeleton;
   }
 
   return {
@@ -61,8 +167,11 @@ const toSkeleton = (
     type: element.type,
     width: element.width!,
     height: element.height!,
-    label: element.label ? { text: element.label } : undefined,
-  };
+    roundness: element.rounded
+      ? { type: ROUNDNESS.ADAPTIVE_RADIUS }
+      : undefined,
+    label,
+  } as ExcalidrawElementSkeleton;
 };
 
 const getTargetCenter = (

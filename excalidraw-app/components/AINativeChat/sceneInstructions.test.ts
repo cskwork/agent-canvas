@@ -107,6 +107,130 @@ describe("parseAIDiagram", () => {
     );
   });
 
+  it("parses multi-point arrows without explicit dimensions", () => {
+    const diagram = validDiagram();
+    const arrow = diagram.elements[2] as Record<string, unknown>;
+    delete arrow.width;
+    delete arrow.height;
+    arrow.points = [
+      [0, 0],
+      [60, -40],
+      [120, 0],
+    ];
+    arrow.rounded = true;
+    arrow.endArrowhead = "triangle";
+
+    const parsed = parseAIDiagram(diagram);
+    expect(parsed.elements[2].points).toHaveLength(3);
+    expect(parsed.elements[2].rounded).toBe(true);
+  });
+
+  it("rejects points on non-linear elements", () => {
+    const diagram = validDiagram();
+    Object.assign(diagram.elements[0], {
+      points: [
+        [0, 0],
+        [10, 10],
+      ],
+    });
+
+    expect(() => parseAIDiagram(diagram)).toThrow(
+      "points is only allowed for arrow, line, and freedraw",
+    );
+  });
+
+  it("requires points for freedraw elements", () => {
+    const diagram = validDiagram();
+    diagram.elements.push({
+      id: "sketch",
+      type: "freedraw",
+      x: 0,
+      y: 0,
+    } as unknown as typeof diagram.elements[number]);
+
+    expect(() => parseAIDiagram(diagram)).toThrow(
+      "points is required for freedraw elements",
+    );
+  });
+
+  it("validates frame children", () => {
+    const diagram = validDiagram();
+    diagram.elements.push({
+      id: "wrap",
+      type: "frame",
+      x: 0,
+      y: 0,
+      children: ["start", "missing"],
+    } as unknown as typeof diagram.elements[number]);
+
+    expect(() => parseAIDiagram(diagram)).toThrow(
+      "Unknown frame child: missing",
+    );
+  });
+
+  it("rejects frames inside frames", () => {
+    const diagram = validDiagram();
+    diagram.elements.push(
+      {
+        id: "inner",
+        type: "frame",
+        x: 0,
+        y: 0,
+        children: ["start"],
+      } as unknown as typeof diagram.elements[number],
+      {
+        id: "outer",
+        type: "frame",
+        x: 0,
+        y: 0,
+        children: ["inner"],
+      } as unknown as typeof diagram.elements[number],
+    );
+
+    expect(() => parseAIDiagram(diagram)).toThrow(
+      "Frame outer cannot contain another frame",
+    );
+  });
+
+  it("requires a link for embeddable elements", () => {
+    const diagram = validDiagram();
+    diagram.elements.push({
+      id: "embed",
+      type: "embeddable",
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 200,
+    } as unknown as typeof diagram.elements[number]);
+
+    expect(() => parseAIDiagram(diagram)).toThrow(
+      "link is required for embeddable elements",
+    );
+  });
+
+  it("rejects arrowheads outside arrow elements", () => {
+    const diagram = validDiagram();
+    Object.assign(diagram.elements[0], { endArrowhead: "triangle" });
+
+    expect(() => parseAIDiagram(diagram)).toThrow(
+      "endArrowhead is only allowed for arrow elements",
+    );
+  });
+
+  it("accepts transparent colors and text styling", () => {
+    const diagram = validDiagram();
+    Object.assign(diagram.elements[0], {
+      backgroundColor: "transparent",
+      fontSize: 24,
+      fontFamily: "code",
+      textAlign: "left",
+    });
+
+    const parsed = parseAIDiagram(diagram);
+    expect(parsed.elements[0].backgroundColor).toBe("transparent");
+    expect(parsed.elements[0].fontFamily).toBe("code");
+  });
+
   it("validates the whole batch instead of returning partial elements", () => {
     const diagram = validDiagram();
     diagram.elements.push({
