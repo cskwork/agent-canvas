@@ -11,6 +11,9 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
+import { parseAIDiagram } from "../../excalidraw-app/components/AINativeChat/sceneInstructions";
+
+import type { AIDiagram } from "../../excalidraw-app/components/AINativeChat/aiTypes";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
@@ -23,27 +26,6 @@ type AgentDefinition = {
   description: string;
   executable: string;
 };
-
-type AgentElement = {
-  id: string;
-  type: "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  text?: string;
-  label?: string;
-  fromId?: string;
-  toId?: string;
-  strokeColor?: string;
-  backgroundColor?: string;
-  fillStyle?: "hachure" | "solid" | "cross-hatch";
-  strokeStyle?: "solid" | "dashed" | "dotted";
-  roughness?: 0 | 1 | 2;
-  opacity?: number;
-};
-
-type Diagram = { summary: string; elements: AgentElement[] };
 
 const AGENTS: AgentDefinition[] = [
   {
@@ -69,35 +51,6 @@ const AGENTS: AgentDefinition[] = [
 const MAX_REQUEST_BYTES = 96 * 1024;
 const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 const AGENT_TIMEOUT_MS = 120_000;
-const ALLOWED_ELEMENT_KEYS = new Set([
-  "id",
-  "type",
-  "x",
-  "y",
-  "width",
-  "height",
-  "text",
-  "label",
-  "fromId",
-  "toId",
-  "strokeColor",
-  "backgroundColor",
-  "fillStyle",
-  "strokeStyle",
-  "roughness",
-  "opacity",
-]);
-const ELEMENT_TYPES = new Set([
-  "rectangle",
-  "ellipse",
-  "diamond",
-  "text",
-  "arrow",
-  "line",
-]);
-const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -307,162 +260,27 @@ const parseJSONDocument = (value: string): unknown => {
   }
 };
 
-const finiteBetween = (value: unknown, minimum: number, maximum: number) =>
-  typeof value === "number" &&
-  Number.isFinite(value) &&
-  value >= minimum &&
-  value <= maximum;
-
-export const validateDiagram = (value: unknown): Diagram => {
-  if (!isRecord(value)) {
-    throw new Error("Drawing response must be an object");
-  }
-  if (
-    typeof value.summary !== "string" ||
-    value.summary.length === 0 ||
-    value.summary.length > 500 ||
-    !Array.isArray(value.elements) ||
-    value.elements.length === 0 ||
-    value.elements.length > 80
-  ) {
-    throw new Error("Drawing response has an invalid summary or element list");
-  }
-
-  const elements: AgentElement[] = value.elements.map((rawValue, index) => {
-    if (!isRecord(rawValue)) {
-      throw new Error(`Element ${index + 1} must be an object`);
-    }
-    // Agents without schema enforcement (hermes) occasionally add extra or
-    // null fields; drop them instead of rejecting the whole drawing.
-    const raw = Object.fromEntries(
-      Object.entries(rawValue).filter(
-        ([key, fieldValue]) =>
-          ALLOWED_ELEMENT_KEYS.has(key) && fieldValue !== null,
-      ),
-    );
-    if (typeof raw.id !== "string" || !ID_PATTERN.test(raw.id)) {
-      throw new Error(`Element ${index + 1} has an invalid id`);
-    }
-    if (typeof raw.type !== "string" || !ELEMENT_TYPES.has(raw.type)) {
-      throw new Error(`Element ${index + 1} has an unsupported type`);
-    }
-    if (
-      !finiteBetween(raw.x, -10_000, 10_000) ||
-      !finiteBetween(raw.y, -10_000, 10_000) ||
-      !finiteBetween(raw.width, -4_000, 4_000) ||
-      !finiteBetween(raw.height, -4_000, 4_000)
-    ) {
-      throw new Error(`Element ${index + 1} has invalid geometry`);
-    }
-    if (
-      raw.type !== "arrow" &&
-      raw.type !== "line" &&
-      ((raw.width as number) < 1 || (raw.height as number) < 1)
-    ) {
-      throw new Error(`Element ${index + 1} must have a positive size`);
-    }
-    if (
-      raw.type === "text" &&
-      (typeof raw.text !== "string" || raw.text.length === 0)
-    ) {
-      throw new Error(`Text element ${index + 1} is missing text`);
-    }
-    for (const key of ["text", "label"] as const) {
-      if (
-        raw[key] !== undefined &&
-        (typeof raw[key] !== "string" || raw[key].length > 2_000)
-      ) {
-        throw new Error(`Element ${index + 1} has invalid ${key}`);
-      }
-    }
-    for (const key of ["fromId", "toId"] as const) {
-      if (
-        raw[key] !== undefined &&
-        (typeof raw[key] !== "string" || !ID_PATTERN.test(raw[key]))
-      ) {
-        throw new Error(`Element ${index + 1} has an invalid reference`);
-      }
-    }
-    if (
-      raw.type === "line" &&
-      (raw.label !== undefined ||
-        raw.fromId !== undefined ||
-        raw.toId !== undefined)
-    ) {
-      throw new Error(
-        `Line element ${index + 1} cannot have labels or bindings`,
-      );
-    }
-    for (const key of ["strokeColor", "backgroundColor"] as const) {
-      if (
-        raw[key] !== undefined &&
-        (typeof raw[key] !== "string" || !COLOR_PATTERN.test(raw[key]))
-      ) {
-        throw new Error(`Element ${index + 1} has an invalid color`);
-      }
-    }
-    if (
-      raw.fillStyle !== undefined &&
-      !["hachure", "solid", "cross-hatch"].includes(String(raw.fillStyle))
-    ) {
-      throw new Error(`Element ${index + 1} has an invalid fill style`);
-    }
-    if (
-      raw.strokeStyle !== undefined &&
-      !["solid", "dashed", "dotted"].includes(String(raw.strokeStyle))
-    ) {
-      throw new Error(`Element ${index + 1} has an invalid stroke style`);
-    }
-    if (
-      raw.roughness !== undefined &&
-      ![0, 1, 2].includes(raw.roughness as number)
-    ) {
-      throw new Error(`Element ${index + 1} has invalid roughness`);
-    }
-    if (raw.opacity !== undefined && !finiteBetween(raw.opacity, 0, 100)) {
-      throw new Error(`Element ${index + 1} has invalid opacity`);
-    }
-    return raw as unknown as AgentElement;
-  });
-
-  const ids = new Set<string>();
-  for (const element of elements) {
-    if (ids.has(element.id)) {
-      throw new Error(`Duplicate element id: ${element.id}`);
-    }
-    ids.add(element.id);
-  }
-  const typesById = new Map(
-    elements.map((element) => [element.id, element.type]),
-  );
-  for (const element of elements) {
-    for (const reference of [element.fromId, element.toId]) {
-      if (reference && !ids.has(reference)) {
-        throw new Error(`Unknown element reference: ${reference}`);
-      }
-      if (
-        reference &&
-        !["rectangle", "ellipse", "diamond"].includes(typesById.get(reference)!)
-      ) {
-        throw new Error(
-          `Element reference ${reference} is not a bindable shape`,
-        );
-      }
-    }
-  }
-
-  return { summary: value.summary.trim(), elements };
-};
+// The bridge shares the drawing contract with the client-side parser and
+// runs it in lenient mode: agents without schema enforcement (hermes) emit
+// extra, null, or misplaced fields, which get normalized instead of rejected.
+export const validateDiagram = (value: unknown): AIDiagram =>
+  parseAIDiagram(value, { lenient: true });
 
 const buildSystemPrompt =
   () => `You are the drawing engine for an Excalidraw canvas.
-Return only one JSON object matching the provided schema. Never return markdown, prose outside JSON, code, URLs, images, HTML, or executable instructions.
+Return only one JSON object matching the provided schema. Never return markdown, prose outside JSON, code, images, HTML, or executable instructions.
 Create a clear editable diagram from the user's request. Use coordinates near (0, 0), balanced spacing, concise labels, and at most 40 elements unless more are essential.
-The root object must contain exactly summary and elements. Each element may contain only: id, type, x, y, width, height, text, label, fromId, toId, strokeColor, backgroundColor, fillStyle, strokeStyle, roughness, opacity.
-Each element needs a unique short id, type, x, y, width, and height. For text elements also set text. For rectangle, ellipse, and diamond use label for centered text. For arrows, fromId and toId may reference only rectangle, ellipse, or diamond ids. Use arrows when connecting shapes. Arrows and lines may use zero or negative width and height to point in any direction, for example width 0 for a vertical arrow. Lines cannot have label, fromId, or toId.
-Do not return a full Excalidraw export. Never include version, source, appState, files, seed, angle, strokeWidth, groupIds, boundElements, bindings, points, arrowheads, or any other internal fields.
+The root object must contain exactly summary and elements.
+Element types: rectangle, ellipse, diamond, text, arrow, line, freedraw, frame, embeddable.
+Each element needs a unique short id, type, x, and y. Rectangle, ellipse, diamond, and embeddable also need positive width and height; text needs text; arrow and line need width and height (either may be zero or negative to point in any direction, for example width 0 for a vertical arrow) or a points array; freedraw needs points.
+Optional per element: strokeColor, backgroundColor (six-digit hex or "transparent"), fillStyle (hachure|solid|cross-hatch), strokeStyle (solid|dashed|dotted), strokeWidth (0.5-32), roughness (0|1|2), opacity (0-100), angle in degrees (-360..360), rounded (true for rounded corners or curved lines), link (an https URL opened on click), groupIds (shared strings that group elements).
+Text elements and labels may set fontSize (8-128), fontFamily (hand-drawn|normal|code), and textAlign (left|center|right).
+Rectangle, ellipse, and diamond use label for centered text. Arrows may use label, fromId, and toId referencing only rectangle, ellipse, or diamond ids, plus startArrowhead/endArrowhead (arrow|bar|dot|circle|circle_outline|triangle|triangle_outline|diamond|diamond_outline|crowfoot_one|crowfoot_many|crowfoot_one_or_many|none) and elbowed (true for right-angle routing). Lines and freedraw cannot have label, fromId, or toId.
+points is an array of [x, y] pairs (2-512) relative to the element position; use it for curved or multi-segment arrows and lines, loops, and freedraw strokes.
+frame groups existing elements: set children to their ids and optionally name; use x 0 and y 0 to auto-fit the frame around its children. embeddable embeds a website and requires link plus width and height.
+Do not return a full Excalidraw export. Never include version, source, appState, files, seed, boundElements, bindings, or other internal fields.
 Example of the entire response shape: {"summary":"Idea flows to Launch","elements":[{"id":"idea","type":"rectangle","x":0,"y":0,"width":160,"height":80,"label":"Idea"},{"id":"launch","type":"rectangle","x":320,"y":0,"width":160,"height":80,"label":"Launch"},{"id":"flow","type":"arrow","x":160,"y":40,"width":160,"height":0,"fromId":"idea","toId":"launch"}]}.
-Allowed colors are six-digit hex values. Favor legible, restrained palettes. Text must use backgroundColor #ffffff if a background is required; otherwise omit it.`;
+Favor legible, restrained palettes.`;
 
 const buildPrompt = (request: Record<string, unknown>) => {
   const selection = isRecord(request.selection) ? request.selection : {};

@@ -15,14 +15,24 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "type", "x", "y", "width", "height"],
+        "required": ["id", "type", "x", "y"],
         "properties": {
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "type": {
-            "enum": ["rectangle", "ellipse", "diamond", "text", "arrow", "line"]
+            "enum": [
+              "rectangle",
+              "ellipse",
+              "diamond",
+              "text",
+              "arrow",
+              "line",
+              "freedraw",
+              "frame",
+              "embeddable"
+            ]
           },
           "x": {
             "type": "number",
@@ -44,6 +54,21 @@
             "minimum": -4000,
             "maximum": 4000
           },
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 512,
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number",
+                "minimum": -4000,
+                "maximum": 4000
+              }
+            }
+          },
           "text": {
             "type": "string",
             "maxLength": 2000
@@ -60,19 +85,61 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
+          "startArrowhead": {
+            "enum": [
+              "arrow",
+              "bar",
+              "dot",
+              "circle",
+              "circle_outline",
+              "triangle",
+              "triangle_outline",
+              "diamond",
+              "diamond_outline",
+              "crowfoot_one",
+              "crowfoot_many",
+              "crowfoot_one_or_many",
+              "none"
+            ]
+          },
+          "endArrowhead": {
+            "enum": [
+              "arrow",
+              "bar",
+              "dot",
+              "circle",
+              "circle_outline",
+              "triangle",
+              "triangle_outline",
+              "diamond",
+              "diamond_outline",
+              "crowfoot_one",
+              "crowfoot_many",
+              "crowfoot_one_or_many",
+              "none"
+            ]
+          },
+          "elbowed": {
+            "type": "boolean"
+          },
           "strokeColor": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "pattern": "^(#[0-9a-fA-F]{6}|transparent)$"
           },
           "backgroundColor": {
             "type": "string",
-            "pattern": "^#[0-9a-fA-F]{6}$"
+            "pattern": "^(#[0-9a-fA-F]{6}|transparent)$"
           },
           "fillStyle": {
             "enum": ["hachure", "solid", "cross-hatch"]
           },
           "strokeStyle": {
             "enum": ["solid", "dashed", "dotted"]
+          },
+          "strokeWidth": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 32
           },
           "roughness": {
             "enum": [0, 1, 2]
@@ -81,6 +148,52 @@
             "type": "number",
             "minimum": 0,
             "maximum": 100
+          },
+          "angle": {
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          },
+          "rounded": {
+            "type": "boolean"
+          },
+          "fontSize": {
+            "type": "number",
+            "minimum": 8,
+            "maximum": 128
+          },
+          "fontFamily": {
+            "enum": ["hand-drawn", "normal", "code"]
+          },
+          "textAlign": {
+            "enum": ["left", "center", "right"]
+          },
+          "link": {
+            "type": "string",
+            "pattern": "^https?://",
+            "maxLength": 512
+          },
+          "groupIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+            }
+          },
+          "children": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 80,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+            }
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
           }
         }
       }

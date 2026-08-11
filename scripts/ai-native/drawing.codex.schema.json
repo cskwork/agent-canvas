@@ -15,14 +15,55 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "type", "x", "y", "width", "height", "text", "label", "fromId", "toId", "strokeColor", "backgroundColor", "fillStyle", "strokeStyle", "roughness", "opacity"],
+        "required": [
+          "id",
+          "type",
+          "x",
+          "y",
+          "width",
+          "height",
+          "points",
+          "text",
+          "label",
+          "fromId",
+          "toId",
+          "startArrowhead",
+          "endArrowhead",
+          "elbowed",
+          "strokeColor",
+          "backgroundColor",
+          "fillStyle",
+          "strokeStyle",
+          "strokeWidth",
+          "roughness",
+          "opacity",
+          "angle",
+          "rounded",
+          "fontSize",
+          "fontFamily",
+          "textAlign",
+          "link",
+          "groupIds",
+          "children",
+          "name"
+        ],
         "properties": {
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "type": {
-            "enum": ["rectangle", "ellipse", "diamond", "text", "arrow", "line"]
+            "enum": [
+              "rectangle",
+              "ellipse",
+              "diamond",
+              "text",
+              "arrow",
+              "line",
+              "freedraw",
+              "frame",
+              "embeddable"
+            ]
           },
           "x": {
             "type": "number",
@@ -35,14 +76,50 @@
             "maximum": 10000
           },
           "width": {
-            "type": "number",
-            "minimum": -4000,
-            "maximum": 4000
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -4000,
+                "maximum": 4000
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "height": {
-            "type": "number",
-            "minimum": -4000,
-            "maximum": 4000
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -4000,
+                "maximum": 4000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "points": {
+            "anyOf": [
+              {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 512,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number",
+                    "minimum": -4000,
+                    "maximum": 4000
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "text": {
             "anyOf": [
@@ -88,11 +165,69 @@
               }
             ]
           },
+          "startArrowhead": {
+            "anyOf": [
+              {
+                "enum": [
+                  "arrow",
+                  "bar",
+                  "dot",
+                  "circle",
+                  "circle_outline",
+                  "triangle",
+                  "triangle_outline",
+                  "diamond",
+                  "diamond_outline",
+                  "crowfoot_one",
+                  "crowfoot_many",
+                  "crowfoot_one_or_many",
+                  "none"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endArrowhead": {
+            "anyOf": [
+              {
+                "enum": [
+                  "arrow",
+                  "bar",
+                  "dot",
+                  "circle",
+                  "circle_outline",
+                  "triangle",
+                  "triangle_outline",
+                  "diamond",
+                  "diamond_outline",
+                  "crowfoot_one",
+                  "crowfoot_many",
+                  "crowfoot_one_or_many",
+                  "none"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "elbowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "strokeColor": {
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+                "pattern": "^(#[0-9a-fA-F]{6}|transparent)$"
               },
               {
                 "type": "null"
@@ -103,7 +238,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
+                "pattern": "^(#[0-9a-fA-F]{6}|transparent)$"
               },
               {
                 "type": "null"
@@ -130,6 +265,18 @@
               }
             ]
           },
+          "strokeWidth": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 32
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "roughness": {
             "anyOf": [
               {
@@ -146,6 +293,115 @@
                 "type": "number",
                 "minimum": 0,
                 "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "angle": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": -360,
+                "maximum": 360
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rounded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fontSize": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 8,
+                "maximum": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fontFamily": {
+            "anyOf": [
+              {
+                "enum": ["hand-drawn", "normal", "code"]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "textAlign": {
+            "anyOf": [
+              {
+                "enum": ["left", "center", "right"]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^https?://",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "groupIds": {
+            "anyOf": [
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "anyOf": [
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 80,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
               },
               {
                 "type": "null"
