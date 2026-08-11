@@ -35,10 +35,14 @@ const FONT_FAMILY_BY_NAME: Record<AIFontFamily, FontFamilyValues> = {
 };
 
 const toRadians = (degrees: number | undefined) =>
-  degrees === undefined ? undefined : ((degrees * Math.PI) / 180) as Radians;
+  degrees === undefined ? undefined : (((degrees * Math.PI) / 180) as Radians);
 
 const toArrowhead = (value: AIElementSpec["startArrowhead"]) =>
-  value === undefined ? undefined : value === "none" ? null : (value as Arrowhead);
+  value === undefined
+    ? undefined
+    : value === "none"
+    ? null
+    : (value as Arrowhead);
 
 // Excalidraw expects points[0] at the element origin and width/height to
 // match the point bounds; agents send arbitrary offsets, so normalize.
