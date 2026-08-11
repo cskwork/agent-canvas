@@ -22,17 +22,7 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "type": {
-            "enum": [
-              "rectangle",
-              "ellipse",
-              "diamond",
-              "text",
-              "arrow",
-              "line",
-              "freedraw",
-              "frame",
-              "embeddable"
-            ]
+            "enum": ["rectangle", "ellipse", "diamond", "text", "arrow", "line", "freedraw", "frame", "embeddable"]
           },
           "x": {
             "type": "number",
@@ -86,38 +76,10 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "startArrowhead": {
-            "enum": [
-              "arrow",
-              "bar",
-              "dot",
-              "circle",
-              "circle_outline",
-              "triangle",
-              "triangle_outline",
-              "diamond",
-              "diamond_outline",
-              "crowfoot_one",
-              "crowfoot_many",
-              "crowfoot_one_or_many",
-              "none"
-            ]
+            "enum": ["arrow", "bar", "dot", "circle", "circle_outline", "triangle", "triangle_outline", "diamond", "diamond_outline", "crowfoot_one", "crowfoot_many", "crowfoot_one_or_many", "none"]
           },
           "endArrowhead": {
-            "enum": [
-              "arrow",
-              "bar",
-              "dot",
-              "circle",
-              "circle_outline",
-              "triangle",
-              "triangle_outline",
-              "diamond",
-              "diamond_outline",
-              "crowfoot_one",
-              "crowfoot_many",
-              "crowfoot_one_or_many",
-              "none"
-            ]
+            "enum": ["arrow", "bar", "dot", "circle", "circle_outline", "triangle", "triangle_outline", "diamond", "diamond_outline", "crowfoot_one", "crowfoot_many", "crowfoot_one_or_many", "none"]
           },
           "elbowed": {
             "type": "boolean"
