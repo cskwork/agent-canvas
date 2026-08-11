@@ -19,7 +19,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "type": {
             "enum": ["rectangle", "ellipse", "diamond", "text", "arrow", "line"]
@@ -36,7 +36,7 @@
           },
           "width": {
             "type": "number",
-            "minimum": 1,
+            "minimum": -4000,
             "maximum": 4000
           },
           "height": {
@@ -54,11 +54,11 @@
           },
           "fromId": {
             "type": "string",
-            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "toId": {
             "type": "string",
-            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
           },
           "strokeColor": {
             "type": "string",

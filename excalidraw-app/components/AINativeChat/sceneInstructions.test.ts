@@ -63,6 +63,31 @@ describe("parseAIDiagram", () => {
     );
   });
 
+  it("accepts vertical and leftward arrows with zero or negative width", () => {
+    const diagram = validDiagram();
+    Object.assign(diagram.elements[2], { width: 0, height: 120 });
+    expect(parseAIDiagram(diagram).elements[2].width).toBe(0);
+
+    const leftward = validDiagram();
+    Object.assign(leftward.elements[2], { width: -120, height: 0 });
+    expect(parseAIDiagram(leftward).elements[2].width).toBe(-120);
+  });
+
+  it("accepts ids that start with a digit", () => {
+    const diagram = validDiagram();
+    diagram.elements[1].id = "2fa";
+    diagram.elements[2].toId = "2fa";
+
+    expect(parseAIDiagram(diagram).elements[1].id).toBe("2fa");
+  });
+
+  it("rejects shapes without a positive width", () => {
+    const diagram = validDiagram();
+    diagram.elements[0].width = 0;
+
+    expect(() => parseAIDiagram(diagram)).toThrow("must be a finite number");
+  });
+
   it("rejects non-finite and out-of-range geometry", () => {
     const diagram = validDiagram();
     diagram.elements[0].x = Number.POSITIVE_INFINITY;

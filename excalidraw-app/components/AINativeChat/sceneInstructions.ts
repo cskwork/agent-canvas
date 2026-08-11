@@ -7,7 +7,7 @@ import {
 const MAX_ELEMENTS = 80;
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_SUMMARY_LENGTH = 500;
-const ID_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const ELEMENT_TYPE_SET = new Set<string>(AI_ELEMENT_TYPES);
 const ALLOWED_ROOT_KEYS = new Set(["summary", "elements"]);
@@ -106,7 +106,7 @@ const parseElement = (value: unknown, index: number): AIElementSpec => {
     element.width = assertFiniteNumber(
       value.width,
       `elements[${index}].width`,
-      1,
+      type === "line" || type === "arrow" ? -4_000 : 1,
       4_000,
     );
   }
