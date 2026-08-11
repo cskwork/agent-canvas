@@ -95,7 +95,7 @@ const ELEMENT_TYPES = new Set([
   "arrow",
   "line",
 ]);
-const ID_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -313,7 +313,7 @@ const finiteBetween = (value: unknown, minimum: number, maximum: number) =>
   value >= minimum &&
   value <= maximum;
 
-const validateDiagram = (value: unknown): Diagram => {
+export const validateDiagram = (value: unknown): Diagram => {
   if (!isRecord(value)) {
     throw new Error("Drawing response must be an object");
   }
@@ -332,32 +332,34 @@ const validateDiagram = (value: unknown): Diagram => {
     if (!isRecord(rawValue)) {
       throw new Error(`Element ${index + 1} must be an object`);
     }
+    // Agents without schema enforcement (hermes) occasionally add extra or
+    // null fields; drop them instead of rejecting the whole drawing.
     const raw = Object.fromEntries(
-      Object.entries(rawValue).filter(([, fieldValue]) => fieldValue !== null),
+      Object.entries(rawValue).filter(
+        ([key, fieldValue]) =>
+          ALLOWED_ELEMENT_KEYS.has(key) && fieldValue !== null,
+      ),
     );
-    for (const key of Object.keys(raw)) {
-      if (!ALLOWED_ELEMENT_KEYS.has(key)) {
-        throw new Error(`Element ${index + 1} contains unsupported data`);
-      }
+    if (typeof raw.id !== "string" || !ID_PATTERN.test(raw.id)) {
+      throw new Error(`Element ${index + 1} has an invalid id`);
+    }
+    if (typeof raw.type !== "string" || !ELEMENT_TYPES.has(raw.type)) {
+      throw new Error(`Element ${index + 1} has an unsupported type`);
     }
     if (
-      typeof raw.id !== "string" ||
-      !ID_PATTERN.test(raw.id) ||
-      typeof raw.type !== "string" ||
-      !ELEMENT_TYPES.has(raw.type) ||
       !finiteBetween(raw.x, -10_000, 10_000) ||
       !finiteBetween(raw.y, -10_000, 10_000) ||
-      !finiteBetween(raw.width, 1, 4_000) ||
+      !finiteBetween(raw.width, -4_000, 4_000) ||
       !finiteBetween(raw.height, -4_000, 4_000)
     ) {
-      throw new Error(`Element ${index + 1} has invalid geometry or identity`);
+      throw new Error(`Element ${index + 1} has invalid geometry`);
     }
     if (
       raw.type !== "arrow" &&
       raw.type !== "line" &&
-      (raw.height as number) < 1
+      ((raw.width as number) < 1 || (raw.height as number) < 1)
     ) {
-      throw new Error(`Element ${index + 1} must have a positive height`);
+      throw new Error(`Element ${index + 1} must have a positive size`);
     }
     if (
       raw.type === "text" &&
@@ -457,7 +459,7 @@ const buildSystemPrompt =
 Return only one JSON object matching the provided schema. Never return markdown, prose outside JSON, code, URLs, images, HTML, or executable instructions.
 Create a clear editable diagram from the user's request. Use coordinates near (0, 0), balanced spacing, concise labels, and at most 40 elements unless more are essential.
 The root object must contain exactly summary and elements. Each element may contain only: id, type, x, y, width, height, text, label, fromId, toId, strokeColor, backgroundColor, fillStyle, strokeStyle, roughness, opacity.
-Each element needs a unique short id, type, x, y, width, and height. For text elements also set text. For rectangle, ellipse, and diamond use label for centered text. For arrows, fromId and toId may reference only rectangle, ellipse, or diamond ids. Use arrows when connecting shapes. Lines cannot have label, fromId, or toId.
+Each element needs a unique short id, type, x, y, width, and height. For text elements also set text. For rectangle, ellipse, and diamond use label for centered text. For arrows, fromId and toId may reference only rectangle, ellipse, or diamond ids. Use arrows when connecting shapes. Arrows and lines may use zero or negative width and height to point in any direction, for example width 0 for a vertical arrow. Lines cannot have label, fromId, or toId.
 Do not return a full Excalidraw export. Never include version, source, appState, files, seed, angle, strokeWidth, groupIds, boundElements, bindings, points, arrowheads, or any other internal fields.
 Example of the entire response shape: {"summary":"Idea flows to Launch","elements":[{"id":"idea","type":"rectangle","x":0,"y":0,"width":160,"height":80,"label":"Idea"},{"id":"launch","type":"rectangle","x":320,"y":0,"width":160,"height":80,"label":"Launch"},{"id":"flow","type":"arrow","x":160,"y":40,"width":160,"height":0,"fromId":"idea","toId":"launch"}]}.
 Allowed colors are six-digit hex values. Favor legible, restrained palettes. Text must use backgroundColor #ffffff if a background is required; otherwise omit it.`;
@@ -551,7 +553,6 @@ const invokeAgent = async (options: {
           args: [
             "chat",
             "--quiet",
-            "--safe-mode",
             "--toolsets",
             "clarify",
             "--max-turns",

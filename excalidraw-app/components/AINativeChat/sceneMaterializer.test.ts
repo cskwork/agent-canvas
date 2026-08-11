@@ -57,6 +57,47 @@ describe("AI diagram materialization", () => {
     expect(arrow?.id).not.toBe("query");
   });
 
+  it("materializes vertical arrows with zero width", () => {
+    const elements = materializeAIDiagram({
+      summary: "Vertical flow",
+      elements: [
+        {
+          id: "top",
+          type: "rectangle",
+          x: 0,
+          y: 0,
+          width: 180,
+          height: 80,
+          label: "Top",
+        },
+        {
+          id: "bottom",
+          type: "rectangle",
+          x: 0,
+          y: 200,
+          width: 180,
+          height: 80,
+          label: "Bottom",
+        },
+        {
+          id: "down",
+          type: "arrow",
+          x: 90,
+          y: 80,
+          width: 0,
+          height: 120,
+          fromId: "top",
+          toId: "bottom",
+        },
+      ],
+    });
+    const arrow = elements.find(isArrowElement);
+
+    expect(arrow).toBeDefined();
+    expect(arrow?.startBinding?.elementId).toBeDefined();
+    expect(arrow?.endBinding?.elementId).toBeDefined();
+  });
+
   it("uses a visible default stroke for dark canvases", () => {
     const elements = materializeAIDiagram(
       {
